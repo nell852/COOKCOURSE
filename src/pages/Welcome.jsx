@@ -235,7 +235,7 @@ export default function SpectacularWelcome() {
 
           {/* Titre avec effet de machine à écrire */}
           <motion.h1 className="font-bold text-4xl md:text-7xl mb-6 text-white drop-shadow-2xl" variants={itemVariants}>
-            Bienvenue sur{" "}
+            Bienvenue surrrrr{" "}
             <span className="bg-gradient-to-r from-green-400 via-emerald-500 to-teal-500 bg-clip-text text-transparent">
               <TypewriterText text="CookCourse" />
             </span>
