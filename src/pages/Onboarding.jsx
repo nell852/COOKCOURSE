@@ -1,3 +1,4 @@
+// Onboarding.jsx
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -20,9 +21,9 @@ const Onboarding = () => {
     height: '',
     healthStatus: '',
   });
-  
+
   const [bmi, setBmi] = useState(null);
-  
+
   // Calculate BMI when weight or height changes
   useEffect(() => {
     if (userData.weight && userData.height) {
@@ -35,85 +36,85 @@ const Onboarding = () => {
   }, [userData.weight, userData.height, calculateBMI]);
 
   const steps = [
-    { 
-      id: 'name', 
-      question: 'Quel est votre nom ?', 
+    {
+      id: 'name',
+      question: 'Quel est votre nom ?',
       field: 'name',
       icon: <User className="text-primary-500" size={28} />,
       type: 'text',
-      placeholder: 'Entrez votre nom' 
+      placeholder: 'Entrez votre nom'
     },
-    { 
-      id: 'firstName', 
-      question: 'Quel est votre prénom ?', 
+    {
+      id: 'firstName',
+      question: 'Quel est votre prénom ?',
       field: 'firstName',
       icon: <User className="text-primary-500" size={28} />,
       type: 'text',
-      placeholder: 'Entrez votre prénom' 
+      placeholder: 'Entrez votre prénom'
     },
-    { 
-      id: 'gender', 
-      question: 'Quel est votre genre ?', 
+    {
+      id: 'gender',
+      question: 'Quel est votre genre ?',
       field: 'gender',
       icon: <User className="text-primary-500" size={28} />,
       type: 'select',
       options: ['Homme', 'Femme'],
-      placeholder: 'Sélectionnez votre genre' 
+      placeholder: 'Sélectionnez votre genre'
     },
-    { 
-      id: 'address', 
-      question: 'Quelle est votre adresse ?', 
+    {
+      id: 'address',
+      question: 'Quelle est votre adresse ?',
       field: 'address',
       icon: <MapPin className="text-primary-500" size={28} />,
       type: 'text',
-      placeholder: 'Entrez votre adresse' 
+      placeholder: 'Entrez votre adresse'
     },
-    { 
-      id: 'email', 
-      question: 'Quelle est votre adresse e-mail ?', 
+    {
+      id: 'email',
+      question: 'Quelle est votre adresse e-mail ?',
       field: 'email',
       icon: <Mail className="text-primary-500" size={28} />,
       type: 'email',
-      placeholder: 'Entrez votre e-mail' 
+      placeholder: 'Entrez votre e-mail'
     },
-    { 
-      id: 'photo', 
-      question: 'Ajoutez une photo de profil', 
+    {
+      id: 'photo',
+      question: 'Ajoutez une photo de profil',
       field: 'photo',
       icon: <Image className="text-primary-500" size={28} />,
       type: 'file',
       accept: 'image/*',
-      placeholder: 'Choisir une image' 
+      placeholder: 'Choisir une image'
     },
-    { 
-      id: 'weight', 
-      question: 'Quel est votre poids (kg) ?', 
+    {
+      id: 'weight',
+      question: 'Quel est votre poids (kg) ?',
       field: 'weight',
       icon: <Scale className="text-primary-500" size={28} />,
       type: 'number',
-      placeholder: 'Entrez votre poids en kg' 
+      placeholder: 'Entrez votre poids en kg'
     },
-    { 
-      id: 'height', 
-      question: 'Quelle est votre taille (cm) ?', 
+    {
+      id: 'height',
+      question: 'Quelle est votre taille (cm) ?',
       field: 'height',
       icon: <Ruler className="text-primary-500" size={28} />,
       type: 'number',
-      placeholder: 'Entrez votre taille en cm' 
+      placeholder: 'Entrez votre taille en cm'
     },
-    { 
-      id: 'healthStatus', 
-      question: 'Avez-vous des allergies ou problèmes de santé ?', 
+    {
+      id: 'healthStatus',
+      question: 'Avez-vous des allergies ou problèmes de santé ?',
       field: 'healthStatus',
       icon: <Heart className="text-primary-500" size={28} />,
       type: 'textarea',
-      placeholder: 'Décrivez vos allergies ou problèmes de santé (optionnel)' 
+      placeholder: 'Décrivez vos allergies ou problèmes de santé (optionnel)'
     },
   ];
 
   const handleInputChange = (e) => {
     const { name, value, type, files } = e.target;
-    
+
     if (type === 'file' && files && files[0]) {
       // For demo purposes, we're just storing the file name
       // In a real app, you would upload to Firebase Storage
@@ -138,7 +139,7 @@ const Onboarding = () => {
         ...userData,
         bmi: bmi
       });
-      
+
       if (success) {
         navigate('/family-members');
       }
@@ -152,7 +153,7 @@ const Onboarding = () => {
   };
 
   const currentStep = steps[step];
-  
+
   const renderInputField = () => {
     switch (currentStep.type) {
       case 'select':
@@ -187,8 +188,8 @@ const Onboarding = () => {
               <div className="flex flex-col items-center justify-center h-32 border-2 border-dashed border-slate-300 rounded-lg hover:border-primary-400 transition-colors">
                 <Image size={36} className="text-slate-400 mb-2" />
                 <span className="text-slate-500">
-                  {userData[currentStep.field] 
-                    ? userData[currentStep.field] 
+                  {userData[currentStep.field]
+                    ? userData[currentStep.field]
                     : 'Cliquez pour ajouter une photo'}
                 </span>
               </div>
@@ -238,12 +239,12 @@ const Onboarding = () => {
     <div className="min-h-screen bg-slate-50 flex flex-col">
       {/* Progress bar */}
       <div className="w-full bg-slate-200 h-1">
-        <div 
+        <div
           className="bg-primary-500 h-1 transition-all duration-300"
           style={{ width: `${((step + 1) / steps.length) * 100}%` }}
         ></div>
       </div>
-      
+
       <div className="flex-1 container-custom py-8 flex flex-col">
         {/* Step indicator */}
         <div className="text-center mb-8">
@@ -251,9 +252,9 @@ const Onboarding = () => {
             Étape {step + 1} sur {steps.length}
           </p>
         </div>
-        
+
         <AnimatePresence mode="wait">
-          <motion.div 
+          <motion.div
             key={step}
             initial={{ opacity: 0, x: 20 }}
             animate={{ opacity: 1, x: 0 }}
@@ -265,21 +266,21 @@ const Onboarding = () => {
                 {currentStep.icon}
                 <h2 className="text-2xl font-semibold ml-3">{currentStep.question}</h2>
               </div>
-              
+
               {renderInputField()}
               {renderBMIResult()}
-              
+
               <div className="mt-auto pt-8 flex justify-between">
                 {step > 0 ? (
-                  <button 
+                  <button
                     onClick={handlePrevious}
                     className="btn btn-secondary"
                   >
                     Précédent
                   </button>
                 ) : <div></div>}
-                
-                <button 
+
+                <button
                   onClick={handleNext}
                   className="btn btn-primary"
                   disabled={!userData[currentStep.field] && currentStep.field !== 'healthStatus'}
