@@ -25,7 +25,7 @@ const Navbar = () => {
     { path: '/marketall', label: 'MarketAll', icon: <MapPin size={20} /> },
     { path: '/marketlist', label: 'Liste de Marché', icon: <ShoppingCart size={20} /> },
     { path: '/stock', label: 'Stock', icon: <Package size={20} /> },
-    { path: '/recommendations', label: 'Recommandations', icon: <Brain size={20} /> },
+  
     { path: '/chatbot', label: 'Chatbot', icon: <ChefHat size={20} /> }, // Ajout du Chatbot
     { path: '/profile', label: 'Profil', icon: <User size={20} /> }, 
   ];

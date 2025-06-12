@@ -1,52 +1,95 @@
 // UserContext.jsx
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { auth } from '../firebase/config';
-import { onAuthStateChanged } from 'firebase/auth';
+import { db } from '../firebase/config';
+import { doc, setDoc, getDoc } from 'firebase/firestore';
 
 const UserContext = createContext();
 
 export const UserProvider = ({ children }) => {
   const [user, setUser] = useState(null);
+  const [familyMembers, setFamilyMembers] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
-      if (firebaseUser) {
-        console.log('User is authenticated with UID:', firebaseUser.uid);
-        setUser({
-          uid: firebaseUser.uid,
-          email: firebaseUser.email,
-          displayName: firebaseUser.displayName,
-          // Ajoutez d'autres champs d'authentification si nécessaire
-        });
-      } else {
-        console.log('No user is authenticated.');
-        setUser(null);
+    const loadUserData = async () => {
+      let userId = localStorage.getItem('cookCourseUserId');
+      if (!userId) {
+        userId = 'user_' + Math.random().toString(36).substring(2, 15);
+        localStorage.setItem('cookCourseUserId', userId);
+      }
+
+      try {
+        const userDoc = await getDoc(doc(db, 'users', userId));
+        if (userDoc.exists()) {
+          const data = userDoc.data();
+          setUser({
+            id: userId,
+            ...data,
+          });
+          setFamilyMembers(data.familyMembers || []);
+        } else {
+          console.log('Aucune donnée utilisateur trouvée, utilisateur vide.');
+        }
+      } catch (error) {
+        console.error('Erreur lors du chargement des données utilisateur :', error);
       }
       setLoading(false);
-    });
+    };
 
-    return () => unsubscribe();
+    loadUserData();
   }, []);
 
   const calculateBMI = (weight, height) => {
-    // Convert height from cm to meters
+    if (!weight || !height) return null;
     const heightInMeters = height / 100;
-    // Calculate BMI
-    return (weight / (heightInMeters * heightInMeters)).toFixed(2);
+    const bmi = weight / (heightInMeters * heightInMeters);
+    return bmi.toFixed(1);
   };
 
   const saveUser = async (userData) => {
-    // Ici, vous pouvez ajouter la logique pour sauvegarder les données de l'utilisateur
-    // Par exemple, sauvegarder dans Firebase Firestore
-    console.log('Saving user data:', userData);
-    // Simuler une sauvegarde réussie
-    return true;
+    const userId = localStorage.getItem('cookCourseUserId');
+    try {
+      await setDoc(doc(db, 'users', userId), {
+        ...userData,
+        familyMembers, // Conserver les membres de la famille existants
+        updatedAt: new Date(),
+        id: userId,
+      }, { merge: true });
+      setUser(userData);
+      return true;
+    } catch (error) {
+      console.error('Erreur lors de l’enregistrement des données utilisateur :', error);
+      return false;
+    }
+  };
+
+  const saveFamilyMembers = async (members) => {
+    const userId = localStorage.getItem('cookCourseUserId');
+    try {
+      await setDoc(doc(db, 'users', userId), {
+        familyMembers: members,
+        updatedAt: new Date(),
+      }, { merge: true });
+      setFamilyMembers(members);
+      return true;
+    } catch (error) {
+      console.error('Erreur lors de l’enregistrement des membres de la famille :', error);
+      return false;
+    }
+  };
+
+  const value = {
+    user,
+    familyMembers,
+    loading,
+    saveUser,
+    saveFamilyMembers,
+    calculateBMI,
   };
 
   return (
-    <UserContext.Provider value={{ user, loading, calculateBMI, saveUser }}>
-      {children}
+    <UserContext.Provider value={value}>
+      {!loading && children}
     </UserContext.Provider>
   );
 };

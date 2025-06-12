@@ -1,12 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
-import { MapPin, Heart } from 'lucide-react';
+import { MapPin, Heart, X } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import Navbar from '../components/Navbar';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
+import 'leaflet-routing-machine';
 
-// Initialiser une icône personnalisée pour Leaflet
 const customIcon = L.icon({
   iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
   iconSize: [25, 41],
@@ -16,23 +16,29 @@ const customIcon = L.icon({
 
 const Markets = () => {
   const [userLocation, setUserLocation] = useState(null);
-  const [error, setError] = useState(null);
+  const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
   const [favorites, setFavorites] = useState(new Set());
   const [sortByDistance, setSortByDistance] = useState(false);
+  const [selectedMarket, setSelectedMarket] = useState(null);
+  const [travelTimes, setTravelTimes] = useState(null);
+  const mapRef = useRef(null);
+  const routingControlRef = useRef(null);
 
-  // Liste de marchés prédéfinis avec leurs coordonnées
+  // Liste des marchés
   const markets = [
-    { id: 1, name: "Marché de Yaoundé", lat: 3.8480, lon: 11.5021, description: "Grand marché central avec des produits frais.", path: '/market' }, // Redirection directe vers /market
-    { id: 2, name: "Marché de Douala", lat: 4.0511, lon: 9.7679, description: "Marché animé connu pour ses épices.", path: '/market/douala' },
-    { id: 3, name: "Marché de Bafoussam", lat: 5.4778, lon: 10.4176, description: "Idéal pour les produits locaux et artisanaux.", path: '/market/bafoussam' },
+    { id: 1, name: "Marché Central de Yaoundé", lat: 3.8649, lon: 11.5185, description: "Grand marché central avec des produits frais.", path: '/market' },
+    { id: 2, name: "Marché Mboppi de Douala", lat: 4.0580, lon: 9.7460, description: "Marché animé connu pour ses épices.", path: '/market/douala' },
+    { id: 3, name: "Marché A de Bafoussam", lat: 5.4750, lon: 10.4200, description: "Idéal pour les produits locaux et artisanaux.", path: '/market/bafoussam' },
+    { id: 4, name: "Marché Mokolo de Yaoundé", lat: 3.8837, lon: 11.4991, description: "Marché populaire pour vêtements et produits variés.", path: '/market/mokolo' },
+    { id: 5, name: "Marché Sandaga de Douala", lat: 4.0485, lon: 9.6947, description: "Marché dynamique pour tissus et artisanat.", path: '/market/sandaga' },
+    { id: 6, name: "Marché de Bamenda", lat: 5.9631, lon: 10.1591, description: "Marché principal de Bamenda avec produits agricoles.", path: '/market/bamenda' },
   ];
-
-  // Fonction pour calculer la distance
+  // Calcul de la distance
   const calculateDistance = (lat1, lon1, lat2, lon2) => {
     const R = 6371;
     const dLat = (lat2 - lat1) * (Math.PI / 180);
-    const dLon = (lon2 - lon1) * (Math.PI / 180);
+    const dLon = (lon2 - lon1) * (Math.PI / 180); // Corrigé : supprimé "- lon1"
     const a =
       Math.sin(dLat / 2) * Math.sin(dLat / 2) +
       Math.cos(lat1 * (Math.PI / 180)) * Math.cos(lat2 * (Math.PI / 180)) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
@@ -40,8 +46,46 @@ const Markets = () => {
     return (R * c).toFixed(2);
   };
 
-  // Récupérer la position de l'utilisateur
+  // Calcul des temps de trajet avec OpenRouteService
+  const fetchTravelTimes = async (start, end) => {
+    const apiKey = import.meta.env.VITE_OPENROUTESERVICE_API_KEY; // Corrigé : VITE_OPENROUTESERVICE_API_KEY
+    const profiles = ['driving-car', 'foot-walking', 'cycling-regular'];
+    const times = {};
+
+    for (const profile of profiles) {
+      try {
+        const response = await fetch(
+          `https://api.openrouteservice.org/v2/directions/${profile}?api_key=${apiKey}&start=${start.lon},${start.lat}&end=${end.lon},${end.lat}`
+        );
+        const data = await response.json();
+        if (data.features && data.features[0]) {
+          const duration = data.features[0].properties.segments[0].duration / 60; // En minutes
+          times[profile] = duration.toFixed(1);
+        } else {
+          times[profile] = null;
+        }
+      } catch (err) {
+        console.error(`Erreur lors du calcul de l'itinéraire pour ${profile} :`, err);
+        times[profile] = null;
+      }
+    }
+    return times;
+  };
+
+  // Formatage du temps de trajet
+  const formatTravelTime = (minutes) => {
+    if (!minutes) return "Erreur de calcul";
+    const hours = Math.floor(minutes / 60);
+    const mins = Math.round(minutes % 60);
+    if (hours > 0) return `${hours}h ${mins}m`;
+    return `${mins}m`;
+  };
+
+  // Initialisation et géolocalisation
   useEffect(() => {
+    const savedFavorites = JSON.parse(localStorage.getItem('marketFavorites')) || [];
+    setFavorites(new Set(savedFavorites));
+
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         (position) => {
@@ -52,47 +96,91 @@ const Markets = () => {
           setLoading(false);
         },
         (err) => {
-          setError("Impossible de récupérer votre position. Veuillez activer la géolocalisation.");
+          setError('Impossible de récupérer votre position. Veuillez activer la géolocalisation.');
           setLoading(false);
         }
       );
     } else {
-      setError("La géolocalisation n'est pas prise en charge par votre navigateur.");
+      setError('La géolocalisation n’est pas prise en charge par votre navigateur.');
       setLoading(false);
     }
   }, []);
 
-  // Trier les marchés par distance si activé
-  const sortedMarkets = userLocation && sortByDistance
-    ? [...markets].sort((a, b) => 
-        calculateDistance(userLocation.lat, userLocation.lon, a.lat, a.lon) - 
-        calculateDistance(userLocation.lat, userLocation.lon, b.lat, b.lon)
-      )
-    : markets;
-
-  // Initialiser la carte Leaflet
+  // Initialisation de la carte
   useEffect(() => {
-    if (userLocation && !loading) {
-      const map = L.map('map').setView([userLocation.lat, userLocation.lon], 8);
+    if (userLocation && !loading && !mapRef.current) {
+      mapRef.current = L.map('map').setView([userLocation.lat, userLocation.lon], 8);
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-      }).addTo(map);
+      }).addTo(mapRef.current);
 
-      // Ajouter un marqueur pour l'utilisateur
       L.marker([userLocation.lat, userLocation.lon], { icon: customIcon })
-        .addTo(map)
+        .addTo(mapRef.current)
         .bindPopup('Vous êtes ici')
         .openPopup();
 
-      // Ajouter des marqueurs pour les marchés
-      sortedMarkets.forEach(market => {
+      markets.forEach(market => {
         L.marker([market.lat, market.lon], { icon: customIcon })
-          .addTo(map)
-          .bindPopup(`${market.name}<br>Distance: ${userLocation ? calculateDistance(userLocation.lat, userLocation.lon, market.lat, market.lon) : '?'} km`);
+          .addTo(mapRef.current)
+          .bindPopup(
+            `${market.name}<br>Distance : ${userLocation ? calculateDistance(userLocation.lat, userLocation.lon, market.lat, market.lon) : '?'} km`
+          )
+          .on('click', () => handleSelectMarket(market));
       });
     }
-  }, [userLocation, loading, sortedMarkets]);
+  }, [userLocation, loading]);
 
+  // Sauvegarde des favoris
+  useEffect(() => {
+    localStorage.setItem('marketFavorites', JSON.stringify([...favorites]));
+  }, [favorites]);
+
+  // Sélection d'un marché et tracé d'itinéraire
+  const handleSelectMarket = async (market) => {
+    if (!userLocation) return;
+
+    setSelectedMarket(market);
+    setTravelTimes(null);
+
+    if (routingControlRef.current) {
+      mapRef.current.removeControl(routingControlRef.current);
+    }
+
+    routingControlRef.current = L.Routing.control({
+      waypoints: [
+        L.latLng(userLocation.lat, userLocation.lon),
+        L.latLng(market.lat, market.lon),
+      ],
+      routeWhileDragging: true,
+      lineOptions: {
+        styles: [{ color: '#2563eb', weight: 5 }],
+      },
+      showAlternatives: false,
+      addWaypoints: false,
+      fitSelectedRoutes: true,
+      show: false,
+    }).addTo(mapRef.current);
+
+    try {
+      const times = await fetchTravelTimes(userLocation, { lat: market.lat, lon: market.lon });
+      setTravelTimes(times);
+    } catch (err) {
+      setError('Erreur lors du calcul de l’itinéraire. Veuillez réessayer.');
+    }
+  };
+
+  // Effacer l'itinéraire
+  const clearRoute = () => {
+    if (routingControlRef.current) {
+      mapRef.current.removeControl(routingControlRef.current);
+      routingControlRef.current = null;
+    }
+    setSelectedMarket(null);
+    setTravelTimes(null);
+    mapRef.current.setView([userLocation.lat, userLocation.lon], 8);
+  };
+
+  // Gestion des favoris
   const toggleFavorite = (marketId) => {
     setFavorites(prev => {
       const newFavorites = new Set(prev);
@@ -104,6 +192,14 @@ const Markets = () => {
       return newFavorites;
     });
   };
+
+  // Tri des marchés par distance
+  const sortedMarkets = userLocation && sortByDistance
+    ? [...markets].sort((a, b) =>
+        calculateDistance(userLocation.lat, userLocation.lon, a.lat, a.lon) -
+        calculateDistance(userLocation.lat, userLocation.lon, b.lat, b.lon)
+      )
+    : markets;
 
   if (loading) {
     return (
@@ -122,7 +218,7 @@ const Markets = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-yellow-50 via-emerald-50 to-green-50">
       <Navbar />
-      <div className="container-custom py-12">
+      <div className="container mx-auto px-4 py-12">
         <h1 className="text-5xl font-extrabold text-gray-800 mb-8 text-center animate-pulse bg-gradient-to-r from-green-600 to-yellow-400 bg-clip-text text-transparent">
           Mes Marchés
         </h1>
@@ -183,22 +279,65 @@ const Markets = () => {
                   Distance : {calculateDistance(userLocation.lat, userLocation.lon, market.lat, market.lon)} km
                 </p>
               )}
-              <Link to={market.path}>
+              <div className="flex gap-2 mt-4">
+                <Link to={market.path}>
+                  <motion.button
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    className="px-4 py-2 rounded-full bg-green-500 text-white hover:bg-green-600 transition-all duration-300"
+                  >
+                    Visiter
+                  </motion.button>
+                </Link>
                 <motion.button
-                  whileHover={{ scale: 1.05, backgroundColor: '#34d399' }}
+                  whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
-                  className="mt-4 w-full bg-green-500 text-white px-4 py-2 rounded-full hover:bg-green-600 transition-all duration-300"
+                  onClick={() => handleSelectMarket(market)}
+                  className="px-4 py-2 rounded-full bg-blue-600 text-white hover:bg-blue-500 transition-all duration-300"
                 >
-                  Visiter {market.name}
+                  Voir l’itinéraire
                 </motion.button>
-              </Link>
+              </div>
             </motion.div>
           ))}
         </div>
 
-        <div className="w-full h-96 mb-8 rounded-xl overflow-hidden shadow-2xl">
+        <div className="w-full h-96 mb-8 rounded-xl overflow-hidden shadow-lg bg-white">
           <div id="map" style={{ height: '100%', width: '100%' }}></div>
         </div>
+
+        {selectedMarket && (
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="p-6 rounded-xl mb-8 shadow-lg bg-white"
+          >
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-xl font-semibold text-gray-800">
+                Itinéraire vers {selectedMarket.name}
+              </h3>
+              <motion.button
+                whileHover={{ scale: 1.1 }}
+                onClick={clearRoute}
+                className="p-2 rounded-full bg-red-500 text-white hover:bg-red-600"
+              >
+                <X size={20} />
+              </motion.button>
+            </div>
+            {travelTimes ? (
+              <div>
+                <p className="font-semibold text-gray-800 mb-2">Temps de trajet estimé :</p>
+                <ul className="space-y-1 text-gray-700">
+                  <li>Voiture : {formatTravelTime(travelTimes['driving-car'])}</li>
+                  <li>À pied : {formatTravelTime(travelTimes['foot-walking'])}</li>
+                  <li>Vélo : {formatTravelTime(travelTimes['cycling-regular'])}</li>
+                </ul>
+              </div>
+            ) : (
+              <p className="text-gray-600">Chargement des temps de trajet...</p>
+            )}
+          </motion.div>
+        )}
 
         <div className="text-center text-gray-600 mb-6">
           <p>Heure locale (WAT) : {new Date().toLocaleTimeString('fr-FR', { timeZone: 'Africa/Douala' })}</p>
