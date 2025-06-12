@@ -40,4 +40,8 @@ export default defineConfig({
   optimizeDeps: {
     exclude: ['lucide-react'],
   },
+  // Ajoutez cette section pour charger les variables d'environnement
+  define: {
+    'process.env': process.env
+  }
 });
